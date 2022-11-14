@@ -19,11 +19,9 @@
 
 ## Sinossi
 
-In questa relazione si introduce il database key-value Redis, ne si descrivono le funzionalità e i casi d'uso più comuni, e lo si utilizza per sviluppare un'applicazione web scalabile e performante, che sarà poi sottoposta a stress testing.
+In questa relazione si introduce il database key-value [Redis](https://redis.io/), ne si descrivono le funzionalità e i casi d'uso più comuni, e lo si utilizza per sviluppare [un'applicazione web scalabile e performante](https://github.com/Steffo99/distributed-arcade/), che sarà poi sottoposta a stress testing.
 
 ## Redis
-
-### Cos'è?
 
 ### Tipi di dato
 
@@ -45,8 +43,8 @@ In questa relazione si introduce il database key-value Redis, ne si descrivono l
 
 ### Stress testing con [`siege`](https://www.joedog.org/siege-home/)
 
-## Conclusioni
+### Scalabilità orizzontale
 
-### Redis goes brrr
+## Conclusioni
 
 ## Bibliografia
