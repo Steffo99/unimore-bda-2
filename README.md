@@ -23,11 +23,30 @@ In questa relazione si introduce il database key-value Redis, ne si descrivono l
 
 ## Redis
 
+### Cos'è?
+
+### Tipi di dato
+
+### Comandi
+
+### Utilizzi
+
 ## Applicazione
 
-## Benchmarking
+### Rust
+
+### Interfaccia con Redis
+
+### Comandi eseguiti
+
+## Testing e benchmarking
+
+### Richieste HTTP di esempio
+
+### Stress testing con [`siege`](https://www.joedog.org/siege-home/)
 
 ## Conclusioni
 
-## Bibliografia
+### Redis goes brrr
 
+## Bibliografia
