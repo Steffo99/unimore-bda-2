@@ -1,6 +1,6 @@
 [ **Stefano Pigozzi** | Traccia #1 | Tema Big Data | Big Data Analytics | A.A. 2022/2023 | Unimore ]
 
-# Redis per web API scalabili, efficienti e veloci
+# Redis per applicazioni scalabili, efficienti e veloci
 
 > ### Approfondimento NoSQL
 > 
@@ -18,6 +18,8 @@
 > - la relazione deve essere lunga almeno 2000 parole e non più di 3000 parole.
 
 ## Sinossi
+
+In questa relazione si introduce il database key-value Redis, ne si descrivono le funzionalità e i casi d'uso più comuni, e lo si utilizza per sviluppare un'applicazione web scalabile e performante, che sarà poi sottoposta a stress testing.
 
 ## Redis
 
