@@ -16,3 +16,16 @@
 > - la relazione deve avere un titolo e contenere un abstract (riassunto del documento), una sezione di conclusioni e un elenco di riferimenti bibliografici;
 > - è gradito includere una piccola sperimentazione pratica (es. un breve codice di prova per una piattaforma studiata, brevi frammenti di codice a confronto delle caratteristiche di diversi sistemi, ecc.), riassumendo nella parte finale della relazione cosa è stato provato e, se applicabile, i risultati ottenuti;
 > - la relazione deve essere lunga almeno 2000 parole e non più di 3000 parole.
+
+## Sinossi
+
+## Redis
+
+## Applicazione
+
+## Benchmarking
+
+## Conclusioni
+
+## Bibliografia
+
