@@ -46,15 +46,17 @@ In questa relazione si introduce il database key-value [Redis](https://redis.io/
     * può utilizzare il paradigma master-replica, con meccanismi di sincronizzazione atomici, parziali o totali in base allo stato di connessione delle repliche
     * può essere eseguito come cluster, in cui ogni istanza gestisce un sottoinsieme delle chiavi del database complessivo
 
+Per via delle sue caratteristiche, Redis è frequentemente utilizzato come database "secondario": per comunicazione inter-processo o inter-servizio, per caching di dati costosi da computare, o per carichi di lavoro che necessitano di numerosissimi accessi veloci a risorse.
+
 ### Tipi di dato
 
 Redis supporta vari tipi di dati, ciascuno adatto a diversi casi d'uso.
 
 Come menzionato in precedenza, si disambigua tra essi attraverso i comandi utilizzati per accedervi: in particolare, tutti i comandi relativi a un determinato tipo di struttura dati hanno uno specifico prefisso, come ad esempio `Z` per i sorted set.
 
-#### Stringhe
+#### Strings
 
-Il tipo *stringa* in Redis in realtà si riferisce a qualsiasi tipo di dato non strutturato, inclusi numeri o byte di file binari.
+Il tipo [*string*](https://redis.io/docs/data-types/strings/) in Redis in realtà si riferisce a qualsiasi tipo di dato non strutturato, inclusi numeri o byte di file binari.
 
 I comandi che si riferiscono alle stringhe non usano alcun prefisso, e sono `O(1)`:
 
@@ -75,9 +77,9 @@ I comandi che si riferiscono alle stringhe non usano alcun prefisso, e sono `O(1
 
 Sono utili per archiviare e recuperare velocemente attributi di un'entità, implementare meccanismi di sincronizzazione (lock, semafori), realizzare controlli di accesso effimeri (rate limiting), o effettuare conteggi di particolari eventi.
 
-#### List
+#### Lists
 
-Il tipo *list* in Redis rappresenta una serie ordinata di valori stringa.
+Il tipo [*list*](https://redis.io/docs/data-types/lists/) in Redis rappresenta una serie ordinata di valori stringa.
 
 I principali comandi delle liste usano i prefissi `L` o `R`, e sono `O(1)`:
 
@@ -98,9 +100,9 @@ Particolari comandi relativi alle liste permettono al client Redis di bloccare l
 
 I comandi relativi alle liste sono tipicamente utilizzati per realizzare pile (stacks) e code (queues) di eventi, prodotti da alcuni processi e consumati da altri.
 
-#### Set
+#### Sets
 
-Il tipo *set* in Redis rappresenta un insieme di valori stringa unici non ordinato.
+Il tipo [*set*](https://redis.io/docs/data-types/sets/) in Redis rappresenta un insieme di valori stringa unici non ordinato.
 
 I principali comandi dei set usano il prefisso `S`, e sono `O(1)`:
 
@@ -122,7 +124,7 @@ Sono usati nei casi in cui l'**unicità** degli elementi è un fattore chiave de
 
 #### Sorted sets
 
-Il tipo *sorted set* in Redis rappresenta un insieme di valori stringa unici ordinato in base a un punteggio associato a ciascun valore.
+Il tipo [*sorted set*](https://redis.io/docs/data-types/sorted-sets/) in Redis rappresenta un insieme di valori stringa unici ordinato in base a un punteggio associato a ciascun valore.
 
 I principali comandi dei sorted set usano il prefisso `Z`, e sono `O(log(N))`:
 
@@ -141,12 +143,68 @@ Sono usati in casi in cui si necessita di una struttura **sempre ordinata** di e
 
 Redis supporta altre strutture dati meno frequentemente usate:
 
-* gli *hashes*, collezioni chiave-valore innestate in una singola chiave Redis, con prefisso `H`
-* gli *stream*, registri in cui è solo possibile aggiungere valori, con prefisso `X`
-* gli indici *geospatial*, in grado di processare coordinate cartesiane o geografiche, con prefisso `GEO`
-* gli *hyperloglog*, strutture dati probabilistiche in grado di stimare velocemente la cardinalità di insiemi molto grandi, con prefisso `PF`
-* le *bitmap*, array di bit che possono essere modificati o interrogati individualmente, con prefisso o suffisso `BIT`
-* i *bitfields*, interi signed e unsigned di dimensione variabile, attraverso il comando `BITFIELD`
+* gli [*hashes*](https://redis.io/docs/data-types/hashes/), collezioni chiave-valore innestate in una singola chiave Redis, con prefisso `H`
+* gli [*stream*](https://redis.io/docs/data-types/streams/), registri in cui è solo possibile aggiungere valori, con prefisso `X`
+* gli indici [*geospatial*](https://redis.io/docs/data-types/geospatial/), in grado di processare coordinate cartesiane o geografiche, con prefisso `GEO`
+* gli [*hyperloglog*](https://redis.io/docs/data-types/hyperloglogs/), strutture dati probabilistiche in grado di stimare velocemente la cardinalità di insiemi molto grandi, con prefisso `PF`
+* le [*bitmap*](https://redis.io/docs/data-types/bitmaps/), array di bit che possono essere modificati o interrogati individualmente, con prefisso o suffisso `BIT`
+* i [*bitfields*](https://redis.io/docs/data-types/bitfields/), interi signed e unsigned di dimensione variabile, attraverso il comando `BITFIELD`
+
+## Disponibilità e scalabilità
+
+Redis offre numerose funzionalità per fare in modo che il database rimanga sempre disponibile e possa scalare orizzontalmente per supportare numeri di accessi sempre crescenti.
+
+### Replicazione
+
+È possibile creare illimitate [*repliche*](https://redis.io/docs/management/replication/) in sola lettura di qualsiasi database Redis.
+
+Le repliche si connettono al database originale, richiedono ad esso una **sincronizzazione totale**, e poi mantengono la connessione aperta per ricevere dall'originale il **flusso di comandi** necessario a mantenere i dati sincronizzati.
+
+Nel caso una replica perdesse la connessione all'originale, essa continuerebbe a funzionare indipendentemente, e al ripristino della connessione essa può richiedere una **sincronizzazione parziale**, ricevendo i cambiamenti avvenuti al database dal momento della disconnessione.
+
+Questo permette a Redis grandi benefici di scalabilità, rendendo possibile ad esempio:
+
+* distribuire il carico di lavoro geograficamente, minimizzando la latenza tra utente e servizio
+* delegare query di letture computazionalmente costose a una replica, conservando potenza computazionale dell'originale per gestire più scritture
+* eseguire una replica mentre il software del database originale viene aggiornato, mantenendo così il database accessibile tutto il tempo
+
+La sincronizzazione tra le repliche è effettuata asincronamente: ciò significa che la **consistenza non è garantita**, ma che, con il passare del tempo, il database convergerà alla consistenza.
+
+#### Sentinel
+
+A questo sistema può essere aggiunto il servizio [*Redis Sentinel*](https://redis.io/docs/management/sentinel/), un daemon che:
+
+* monitora il database originale e le sue repliche
+* notifica l'amministratore automaticamente nel caso di downtime di un'istanza di Redis
+* promuove una delle repliche a "principale" nel caso il database originale smettesse di essere accessibile
+* comunica autorevolmente alle altre repliche l'indirizzo del nuovo database principale nel caso di un cambio, prevenendo il [problema dei due generali](https://en.wikipedia.org/wiki/Two_Generals'_Problem)
+
+### Clustering
+
+È possibile configurare più istanze di Redis perchè funzionino come un unico database utilizzando [*Redis Cluster*](https://redis.io/docs/management/scaling/).
+
+Attraverso di esso, le istanze si spartiscono l'autorità su determinate chiavi, effettuando l'hash su di esse per determinare quale istanza è la "originale" per la data chiave.
+
+In particolare, l'hash viene effettuato sulla parte di chiave contenuta tra parentesi graffe, permettendo a una data istanza di avere l'autorità su tutte le chiavi relative a una certa entità.
+
+Ad esempio, tutte queste chiavi saranno assegnate alla stessa istanza:
+
+```
+board:{first}:scores
+board:{first}:name
+board:{first}:creation_date
+user:{first}:name
+```
+
+Queste chiavi potrebbero invece venire assegnate a un'altra istanza:
+
+```
+board:{second}:scores
+user:{third}:name
+second
+```
+
+Come per le repliche, essendo la sincronizzazione tra i cluster effettuata asincronamente, la **consistenza non è garantita**.
 
 ## Applicazione
 
