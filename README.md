@@ -208,6 +208,20 @@ Come per le repliche, essendo la sincronizzazione tra i cluster effettuata asinc
 
 ## Applicazione
 
+Per testare le caratteristiche di Redis, ho sviluppato una piccola applicazione che lo utilizza.
+
+L'applicazione, [**Distributed Arcade**](https://github.com/Steffo99/distributed-arcade), è un servizio di gestione classifiche in grado di processare l'immissione di numerosissimi punteggi senza avere grossi costi di performance sulle macchine su cui è ospitato.
+
+![Diagramma di funzionamento di Distributed Arcade](media/diagram-app.png)
+
+L'applicazione è intesa per essere utilizzata da videogiochi disponibili su svariate piattaforme: browser web, desktop computer, smartphone e tablet...  
+A tale scopo, si è scelto di realizzarla come una web API attraverso la quale essi possano interfacciarsi in modo controllato con il database Redis.
+
+Nell'applicazione, amministratori autorizzati possono creare ***board*** ("tabelloni", da *leaderboard*, "classifica"), ricevendo un ***token*** (una stringa di testo url-safe generata in modo crittograficamente sicuro) per l'immissione di punteggi in quello specifico board.
+Il token può poi essere inserito all'interno delle applicazioni che si desidera autorizzare a inserire ***score*** ("punteggi") nel board, in modo che esse possano periodicamente inviare i risultati dei giocatori.
+
+In qualsiasi momento, le applicazioni possono interrogare l'applicazione per ricevere lo stato aggiornato di un board, o la posizione in classifica di un player specifico, in modo da avere dati da visualizzare all'utente.
+
 ### Rust
 
 ### Interfaccia con Redis
