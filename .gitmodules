@@ -1,0 +1,3 @@
+[submodule "distributed-arcade"]
+	path = distributed-arcade
+	url = https://github.com/Steffo99/distributed-arcade
