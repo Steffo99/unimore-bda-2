@@ -208,33 +208,107 @@ Come per le repliche, essendo la sincronizzazione tra i cluster effettuata asinc
 
 ## Applicazione
 
-Per testare le caratteristiche di Redis, ho sviluppato una piccola applicazione che lo utilizza.
+Per testare le caratteristiche di Redis, si è sviluppato una piccola applicazione che lo utilizza.
 
 L'applicazione, [**Distributed Arcade**](https://github.com/Steffo99/distributed-arcade), è un servizio di gestione classifiche in grado di processare l'immissione di numerosissimi punteggi senza avere grossi costi di performance sulle macchine su cui è ospitato.
 
-![Diagramma di funzionamento di Distributed Arcade](media/diagram-app.png)
-
-L'applicazione è intesa per essere utilizzata da videogiochi disponibili su svariate piattaforme: browser web, desktop computer, smartphone e tablet...  
+L'applicazione è intesa per essere utilizzata da videogiochi disponibili su svariate piattaforme (*user agent*): browser web, desktop computer, smartphone e tablet...  
 A tale scopo, si è scelto di realizzarla come una web API attraverso la quale essi possano interfacciarsi in modo controllato con il database Redis.
 
+![Diagramma di funzionamento di Distributed Arcade](media/diagram-app.png)
+
+### Linguaggio e dipendenze
+
+Al fine di minimizzare il tempo richiesto per l'esecuzione di una richiesta, si è deciso di realizzarla con [Rust](http://rust-lang.org/), un nuovo linguaggio di programmazione compilato ed efficiente, e in particolare con il framework web [Axum](https://crates.io/crates/axum).
+
+Per permettere all'applicazione di interfacciarsi con Redis, si è scelto di usare la crate [`redis`](https://crates.io/crates/redis) di Rust, che gestisce i dettagli a basso livello di connessione e permette di chiamare comandi Redis all'interno del codice come se fossero funzioni.
+
+```rust
+// Un esempio di chiamata del comando Redis ZSCORE da Rust
+let score: f64 = rconn.zscore("board:example:scores", "player:steffo").await
+    .expect("to successfully retrieve the score");
+```
+
+### Funzionalità
+
+Distributed Arcade permette agli user agent che vi si connettono di effettuare [6 tipi di operazioni](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/Steffo99/distributed-arcade/main/docs/openapi.yaml).
+
+![Screenshot della documentazione OpenAPI di Distributed Arcade, renderizzata attraverso Swagger UI](media/screenshot-openapi.png)
+
+#### Ping semplice
+
+Effettuando una richiesta `HTTP GET /`, è possibile verificare che la parte web dell'applicazione sia configurata correttamente.
+
+In caso positivo, essa risponderà all'user agent con il codice di successo `HTTP 204`.
+
+![Diagramma di funzionamento del ping semplice](media/diagram-get-ping.png)
+
+#### Ping completo
+
+Effettuando una richiesta `HTTP POST /`, è possibile verificare che sia l'applicazione sia Redis siano configurati correttamente.
+
+Se l'applicazione è configurata correttamente, essa invia il comando [`PING`](https://redis.io/commands/ping/) al database Redis, e se anch'esso è configurato correttamente, risponderà con la stringa `PONG`, che sarà verificata da Distributed Arcade, rispondendo all'user agent con `HTTP 204`.
+
+![Diagramma di funzionamento del ping completo](media/diagram-post-ping.png)
+
+#### Creazione di board
+
 Nell'applicazione, amministratori autorizzati possono creare ***board*** ("tabelloni", da *leaderboard*, "classifica"), ricevendo un ***token*** (una stringa di testo url-safe generata in modo crittograficamente sicuro) per l'immissione di punteggi in quello specifico board.
-Il token può poi essere inserito all'interno delle applicazioni che si desidera autorizzare a inserire ***score*** ("punteggi") nel board, in modo che esse possano periodicamente inviare i risultati dei giocatori.
 
-In qualsiasi momento, le applicazioni possono interrogare l'applicazione per ricevere lo stato aggiornato di un board, o la posizione in classifica di un player specifico, in modo da avere dati da visualizzare all'utente.
+Perchè venga creato un board, l'amministratore dovrà inviare una richiesta `HTTP POST /board/` all'applicazione con i dati del board che si vuole creare:
 
-### Rust
+* il nome del board
+* l'ordinamento del board, ovvero se i punteggi migliori sono quelli più bassi (***crescente***, come nel golf o nelle gare di corsa) o quelli più alti (***decrescente***, come nel salto in alto o nel calcio)
 
-### Interfaccia con Redis
+Per ostacolare attacchi [denial-of-service](https://en.wikipedia.org/wiki/Denial-of-service_attack) al database Redis, si richiede all'amministratore di allegare alla richiesta (nell'header `Authorization`) una password, impostata all'installazione di Distributed Arcade.
 
-### Comandi eseguiti
+Per la creazione effettiva del board, internamente vengono effettuate alcune operazioni:
+
+1. viene aperta una transazione attraverso il comando [`MULTI`]
+2. viene verificato che nessuna delle chiavi utilizzate dal board contengano già dati
+3. viene scritto l'ordinamento nella chiave `board:{name}:order` con il comando [`SET`]
+4. viene generata in modo crittograficamente sicuro una stringa detta ***token*** che viene archiviata nella chiave `board:{name}:token` con il comando [`SET`]
+5. viene eseguita in blocco la transazione attraverso il comando [`EXEC`]
+
+Terminata la creazione, l'user agent riceve una risposta `HTTP 201` contenente il token generato.
+
+![Diagramma di funzionamento della creazione di board](media/diagram-post-board.png)
+
+[`MULTI`]: https://redis.io/commands/multi/
+[`SET`]: https://redis.io/commands/set/
+[`EXEC`]: https://redis.io/commands/exec/
+
+#### Invio di punteggi
+
+<!-- TODO -->
+
+![Diagramma di funzionamento dell'invio di punteggi](media/diagram-put-score.png)
+
+#### Recupero di punteggi
+
+<!-- TODO -->
+
+![Diagramma di funzionamento del recupero di punteggi](media/diagram-get-score.png)
+
+#### Recupero di classifiche
+
+<!-- TODO -->
+
+![Diagramma di funzionamento del recupero di classifiche](media/diagram-get-board.png)
 
 ## Testing e benchmarking
 
+<!-- TODO -->
+
 ### Richieste HTTP di esempio
+
+<!-- TODO -->
 
 ### Stress testing con [`siege`](https://www.joedog.org/siege-home/)
 
-### Scalabilità orizzontale
+<!-- TODO -->
+
+### Possibile estensione: clustering
 
 ## Conclusioni
 
