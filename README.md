@@ -255,7 +255,7 @@ Se l'applicazione è configurata correttamente, essa invia il comando [`PING`](h
 
 Nell'applicazione, amministratori autorizzati possono creare ***board*** ("tabelloni", da *leaderboard*, "classifica"), ricevendo un ***token*** (una stringa di testo url-safe generata in modo crittograficamente sicuro) per l'immissione di punteggi in quello specifico board.
 
-Perchè venga creato un board, l'amministratore dovrà inviare una richiesta `HTTP POST /board/` all'applicazione con i dati del board che si vuole creare:
+Perchè venga creato un board, l'amministratore dovrà inviare una richiesta `HTTP POST /board/` verso l'applicazione con i dati del board che si vuole creare:
 
 * il nome del board
 * l'ordinamento del board, ovvero se i punteggi migliori sono quelli più bassi (***crescente***, come nel golf o nelle gare di corsa) o quelli più alti (***decrescente***, come nel salto in alto o nel calcio)
@@ -266,7 +266,7 @@ Per la creazione effettiva del board, internamente vengono effettuate alcune ope
 
 1. viene aperta una transazione attraverso il comando [`MULTI`]
 2. viene verificato che nessuna delle chiavi utilizzate dal board contengano già dati
-3. viene scritto l'ordinamento nella chiave `board:{name}:order` con il comando [`SET`]
+3. viene salvato l'ordinamento nella chiave `board:{name}:order` con il comando [`SET`]
 4. viene generata in modo crittograficamente sicuro una stringa detta ***token*** che viene archiviata nella chiave `board:{name}:token` con il comando [`SET`]
 5. viene eseguita in blocco la transazione attraverso il comando [`EXEC`]
 
@@ -280,40 +280,131 @@ Terminata la creazione, l'user agent riceve una risposta `HTTP 201` contenente i
 
 #### Invio di punteggi
 
-<!-- TODO -->
+Una volta creato un board, è possibile utilizzare il token restituito nel momento della sua creazione per inviare nuovi ***score*** (punteggi) al database.
+
+Per inviare un nuovo punteggio, un user agent dovrà effettuare una richiesta `HTTP PUT /score/` verso l'applicazione, specificando:
+
+* il nome del giocatore
+* il punteggio raggiunto
+* il nome del board all'interno del quale si vuole inserire il punteggio
+
+Ricevuta una richiesta, Distributed Arcade effettua le seguenti operazioni:
+
+1. recupera il token del board specificato attraverso il comando [`GET`] `board:{name}:token`
+2. verifica che il token coincida con quello archiviato
+3. recupera l'ordinamento del board con [`GET`] `board:{name}:order`
+4. inserisce il punteggio nella chiave `board:{name}:scores` attraverso il comando Redis [`ZADD`], modificando il punteggio solo in caso di miglioramento:
+    * se il board è in ordine crescente, specifica il parametro `LT`, in modo che punteggi più bassi sovrascrivano quelli più alti
+    * se il board è in ordine decrescente, specifica il parametro `GT`, in modo che punteggi più alti sovrascrivano quelli più bassi
+5. [recupera il nuovo punteggio e la nuova posizione del giocatore come descritto nel paragrafo successivo](recupero-di-punteggi)
+
+Completate le operazioni, l'applicazione restituisce all'user agent il codice `HTTP 201` se il punteggio è stato aggiornato, oppure `HTTP 200` in caso contrario.  
+In entrambi i casi, il corpo della risposta conterrà punteggio e posizione attuali del giocatore in formato JSON, come se fosse stato effettuato un [recupero di punteggi](recupero-di-punteggi).
 
 ![Diagramma di funzionamento dell'invio di punteggi](media/diagram-put-score.png)
 
+[`GET`]: https://redis.io/commands/get/
+[`ZADD`]: https://redis.io/commands/zadd/
+
 #### Recupero di punteggi
 
-<!-- TODO -->
+In qualsiasi momento, un user agent può richiedere di ricevere il punteggio e la posizione in classifica di un giocatore effettuando una richiesta `HTTP GET /score/`, specificando il nome del board e del giocatore interessati.
+
+Alla ricezione, Distributed Arcade:
+
+1. Recupera il punteggio attuale del giocatore eseguendo il comando [`ZSCORE`] sulla chiave `board:{name}:scores`
+2. Recupera l'ordinamento del board attraverso il comando [`GET`] `board:{name}:order`
+3. In base all'ordinamento del board, per ottenere la posizione in classifica del giocatore:
+    * se il board è in ordine crescente, utilizza il comando [`ZRANK`] `board:{name}:scores`
+    * se il board è in ordine decrescente, utilizza invece il comando [`ZREVRANK`] `board:{name}:scores`
+
+Al termine dell'elaborazione, i dati recuperati sono restituiti nel corpo della risposta in formato JSON:
+
+```json
+{
+    "score": 1234.56,
+    "rank": 0
+}
+```
+> La posizione in classifica restituita è indicizzata a 0, quindi questo giocatore sarebbe primo nel suo board!
 
 ![Diagramma di funzionamento del recupero di punteggi](media/diagram-get-score.png)
 
+[`ZSCORE`]: https://redis.io/commands/zscore/
+[`GET`]: https://redis.io/commands/get/
+[`ZRANK`]: https://redis.io/commands/zrank/
+[`ZREVRANK`]: https://redis.io/commands/zrevrank/
+
 #### Recupero di classifiche
 
-<!-- TODO -->
+Infine, gli user agent possono richiedere i dati di un'intero board attraverso una richiesta `HTTP GET /board/`, specificando il nome del board in questione, e l'offset di inizio e dimensione di una pagina di classifica.
+
+Questa richiesta farà in modo che Distributed Arcade:
+
+1. recuperi l'ordinamento del board con il comando [`GET`] `board:{name}:order`
+2. in base all'ordinamento, effettui uno dei due seguenti comandi per ottenere una pagina di classifica:
+    * se il board è in ordine crescente, [`ZRANGE`] `board:{name}:scores` `{offset}` `{offset + size}` `WITHSCORES`
+    * se il board è in ordine decrescente, [`ZRANGE`] `board:{name}:scores` `{offset}` `{offset + size}` `REV` `WITHSCORES`
+
+La pagina ottenuta verrà poi restituita all'user agent, assieme a un codice `HTTP 200`:
+
+```jsonc
+[
+  {
+    "name": "Offets :)",
+    "score": 2468.19
+  },
+  {
+    "name": "Steffo :(",
+    "score": 1234.56
+  },
+  // [...]
+]
+```
 
 ![Diagramma di funzionamento del recupero di classifiche](media/diagram-get-board.png)
 
+[`GET`]: https://redis.io/commands/get/
+[`ZRANGE`]: https://redis.io/commands/zrange/
+
 ## Testing e benchmarking
 
-<!-- TODO -->
+Al fine di verificare correttezza ed efficacia del software, sono stati effettuati test manuali ed automatici.
+
+### Richieste manuali
+
+All'applicazione è stata allegato un file [`openapi.yaml`](https://github.com/Steffo99/distributed-arcade/blob/main/docs/openapi.yaml), che descrive tutti i metodi dell'API e può essere interpretato da software esterni [per essere renderizzato](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/Steffo99/distributed-arcade/main/docs/openapi.yaml) o perchè essi forniscano [assistenza allo sviluppo di consumatori dell'API](https://www.jetbrains.com/help/idea/openapi.html).
+
+Per effettuare test manuali di correttezza dell'API, si è fatto particolare uso di uno di questi renderer, [Swagger UI](https://swagger.io/tools/swagger-ui/).
 
 ### Richieste HTTP di esempio
 
-<!-- TODO -->
+All'applicazione è stato anche allegato un file [`examples.http`](https://github.com/Steffo99/distributed-arcade/blob/main/docs/examples.http) contenente alcune richieste HTTP di esempio che è possibile utilizzare per testare semi-automaticamente il software.
 
-### Stress testing con [`siege`](https://www.joedog.org/siege-home/)
+### Stress testing
 
-<!-- TODO -->
+Per verificare l'efficienza dell'applicazione e del database Redis ad essa connesso, è stato utilizzato [Siege](https://www.joedog.org/siege-home/), un tool per lo stress testing di siti web, configurandolo in modo che inviasse più richieste HTTP possibili di [invio di punteggi](invio-di-punteggi).
 
-### Possibile estensione: clustering
+I risultati ottenuti sono stati eccellenti: è stato raggiunto prima un collo di bottiglia nell'invio delle richieste che nell'elaborazione di esse, raggiungendo le **2400 richieste processate/secondo** in locale su un `AMD Ryzen 5 1600X Six-Core @ 12x 3.6GHz`!
 
-## Conclusioni
+## Possibile estensione: clustering
+
+Nel caso sia necessaria una capacità di elaborazione ancora più elevata, modificando leggermente il nome delle chiavi utilizzate per i board, dovrebbe essere possibile realizzare un [cluster](clustering) di client Redis, permettendo un maggiore throughput in scrittura su diversi board.
+
+## Conclusione
+
+Redis rispetta le caratteristiche con cui si presenta, ovvero di **semplicità**, **efficienza**, **velocità** e **scalabilità**, confermandosi una buona scelta sia nella sua tipica funzione di database secondario, sia nella meno convenzionale funzione di database secondario.
+
+L'applicazione sviluppata ha soddisfatto tutti i requisiti che ci si era posti all'inizio dello sviluppo, ed è stata messa in produzione con successo: è raggiungibile all'indirizzo *https://arcade.steffo.eu/*.  
+Si spera di utilizzarla per applicazioni future.
 
 ## Bibliografia
 
-- [**Documentazione** di Redis](https://redis.io/docs/)
-- [**The SET command is a strange beast**, articolo dal blog di Redis](https://redis.com/blog/set-command-strange-beast/)
-- [**Redis** su Wikipedia](https://en.wikipedia.org/w/index.php?title=Redis&oldid=1115152231)
+La bibliografia è deliberatamente omessa in quanto tutte le fonti utilizzate sono referenziate direttamente all'interno del documento come collegamenti ipertestuali.
+
+Nel caso si stia leggendo una copia della relazione stampata senza rendering dei collegamenti, si riportano qui sotto le principali fonti:
+
+* **Documentazione** di Redis - https://redis.io/docs/
+* **Redis** su Wikipedia - https://en.wikipedia.org/w/index.php?title=Redis&oldid=1115152231
+* **Repository** di Distributed Arcade - https://github.com/Steffo99/distributed-arcade
+* **Documentazione** di Siege - https://www.joedog.org/siege-home/
