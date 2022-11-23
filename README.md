@@ -162,11 +162,11 @@ Le repliche si connettono al database originale, richiedono ad esso una **sincro
 
 Nel caso una replica perdesse la connessione all'originale, essa continuerebbe a funzionare indipendentemente, e al ripristino della connessione essa può richiedere una **sincronizzazione parziale**, ricevendo i cambiamenti avvenuti al database dal momento della disconnessione.
 
-Questo permette a Redis grandi benefici di scalabilità, rendendo possibile ad esempio:
+Questo modello di replicazione offre notevoli benefici di scalabilità, rendendo possibile ad esempio:
 
-* distribuire il carico di lavoro geograficamente, minimizzando la latenza tra utente e servizio
-* delegare query di letture computazionalmente costose a una replica, conservando potenza computazionale dell'originale per gestire più scritture
-* eseguire una replica mentre il software del database originale viene aggiornato, mantenendo così il database accessibile tutto il tempo
+* **distribuzione geografica** del carico di lavoro, minimizzando la latenza tra utente e servizio
+* **delegarazione a repliche** di query di letture computazionalmente costose, conservando potenza computazionale dell'originale per la gestione delle scritture
+* **sostituzione dell'originale con una replica** mentre il software del database viene aggiornato, mantenendolo accessibile tutto il tempo
 
 La sincronizzazione tra le repliche è effettuata asincronamente: ciò significa che la **consistenza non è garantita**, ma che, con il passare del tempo, il database convergerà alla consistenza.
 
