@@ -150,7 +150,7 @@ Redis supporta altre strutture dati meno frequentemente usate:
 * le [*bitmap*](https://redis.io/docs/data-types/bitmaps/), array di bit che possono essere modificati o interrogati individualmente, con prefisso o suffisso `BIT`
 * i [*bitfields*](https://redis.io/docs/data-types/bitfields/), interi signed e unsigned di dimensione variabile, attraverso il comando `BITFIELD`
 
-## Disponibilità e scalabilità
+### Disponibilità e scalabilità
 
 Redis offre numerose funzionalità per fare in modo che il database rimanga sempre disponibile e possa scalare orizzontalmente per supportare numeri di accessi sempre crescenti.
 
