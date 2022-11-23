@@ -162,11 +162,11 @@ Le repliche si connettono al database originale, richiedono ad esso una **sincro
 
 Nel caso una replica perdesse la connessione all'originale, essa continuerebbe a funzionare indipendentemente, e al ripristino della connessione essa può richiedere una **sincronizzazione parziale**, ricevendo i cambiamenti avvenuti al database dal momento della disconnessione.
 
-Questo permette a Redis grandi benefici di scalabilità, rendendo possibile ad esempio:
+Questo modello di replicazione offre notevoli benefici di scalabilità, rendendo possibile ad esempio:
 
-* distribuire il carico di lavoro geograficamente, minimizzando la latenza tra utente e servizio
-* delegare query di letture computazionalmente costose a una replica, conservando potenza computazionale dell'originale per gestire più scritture
-* eseguire una replica mentre il software del database originale viene aggiornato, mantenendo così il database accessibile tutto il tempo
+* **distribuzione geografica** del carico di lavoro, minimizzando la latenza tra utente e servizio
+* **delegarazione a repliche** di query di letture computazionalmente costose, conservando potenza computazionale dell'originale per la gestione delle scritture
+* **sostituzione dell'originale con una replica** mentre il software del database viene aggiornato, mantenendolo accessibile tutto il tempo
 
 La sincronizzazione tra le repliche è effettuata asincronamente: ciò significa che la **consistenza non è garantita**, ma che, con il passare del tempo, il database convergerà alla consistenza.
 
@@ -177,13 +177,13 @@ A questo sistema può essere aggiunto il servizio [*Redis Sentinel*](https://red
 * monitora il database originale e le sue repliche
 * notifica l'amministratore automaticamente nel caso di downtime di un'istanza di Redis
 * promuove una delle repliche a "principale" nel caso il database originale smettesse di essere accessibile
-* comunica autorevolmente alle altre repliche l'indirizzo del nuovo database principale nel caso di un cambio, prevenendo il [problema dei due generali](https://en.wikipedia.org/wiki/Two_Generals'_Problem)
+* comunica autorevolmente alle altre repliche l'indirizzo del nuovo database principale nel caso di un cambio, facendo da coordinatore per evitare che la rete di repliche si frammenti
 
 ### Clustering
 
 È possibile configurare più istanze di Redis perchè funzionino come un unico database utilizzando [*Redis Cluster*](https://redis.io/docs/management/scaling/).
 
-Attraverso di esso, le istanze si spartiscono l'autorità su determinate chiavi, effettuando l'hash su di esse per determinare quale istanza è la "originale" per la data chiave.
+In modalità Cluster, i Redis si spartiscono l'autorità sulle chiavi inserite, effettuandone l'hash per determinare qual è il Redis con l'autorità per modificarla.
 
 In particolare, l'hash viene effettuato sulla parte di chiave contenuta tra parentesi graffe, permettendo a una data istanza di avere l'autorità su tutte le chiavi relative a una certa entità.
 
@@ -210,18 +210,18 @@ Come per le repliche, essendo la sincronizzazione tra i cluster effettuata asinc
 
 Per testare le caratteristiche di Redis, si è sviluppato una piccola applicazione che lo utilizza.
 
-L'applicazione, [**Distributed Arcade**](https://github.com/Steffo99/distributed-arcade), è un servizio di gestione classifiche in grado di processare l'immissione di numerosissimi punteggi senza avere grossi costi di performance sulle macchine su cui è ospitato.
+L'applicazione, [***Distributed Arcade***](https://github.com/Steffo99/distributed-arcade), è un servizio di gestione classifiche in grado di processare l'immissione di numerosissimi punteggi senza avere grossi costi di performance sulle macchine su cui è ospitato.
 
-L'applicazione è intesa per essere utilizzata da videogiochi disponibili su svariate piattaforme (*user agent*): browser web, desktop computer, smartphone e tablet...  
-A tale scopo, si è scelto di realizzarla come una web API attraverso la quale essi possano interfacciarsi in modo controllato con il database Redis.
+L'applicazione è intesa per essere utilizzata da videogiochi disponibili su svariate piattaforme (*user agent*): browser web, desktop computer, smartphone, tablet...  
+A tale scopo, si è scelto di realizzarla come una web API, attraverso la quale gli user agent possono interfacciarsi in modo controllato al database Redis.
 
 ![Diagramma di funzionamento di Distributed Arcade](media/diagram-app.png)
 
 ### Linguaggio e dipendenze
 
-Al fine di minimizzare il tempo richiesto per l'esecuzione di una richiesta, si è deciso di realizzarla con [Rust](http://rust-lang.org/), un nuovo linguaggio di programmazione compilato ed efficiente, e in particolare con il framework web [Axum](https://crates.io/crates/axum).
+Al fine di minimizzare il tempo richiesto per l'esecuzione di una richiesta, si è deciso di realizzare l'applicazione in [Rust](http://rust-lang.org/), un linguaggio di programmazione compilato, sicuro ed efficiente, e in particolare con il framework web [Axum](https://crates.io/crates/axum).
 
-Per permettere all'applicazione di interfacciarsi con Redis, si è scelto di usare la crate [`redis`](https://crates.io/crates/redis) di Rust, che gestisce i dettagli a basso livello di connessione e permette di chiamare comandi Redis all'interno del codice come se fossero funzioni.
+Per permettere all'applicazione di interfacciarsi con Redis, si è scelto di usare la [crate `redis`](https://crates.io/crates/redis), che gestisce i dettagli a basso livello di connessione e permette di chiamare comandi Redis all'interno del codice come se fossero coroutine.
 
 ```rust
 // Un esempio di chiamata del comando Redis ZSCORE da Rust
@@ -232,8 +232,6 @@ let score: f64 = rconn.zscore("board:example:scores", "player:steffo").await
 ### Funzionalità
 
 Distributed Arcade permette agli user agent che vi si connettono di effettuare [6 tipi di operazioni](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/Steffo99/distributed-arcade/main/docs/openapi.yaml).
-
-![Screenshot della documentazione OpenAPI di Distributed Arcade, renderizzata attraverso Swagger UI](media/screenshot-openapi.png)
 
 #### Ping semplice
 
@@ -247,18 +245,18 @@ In caso positivo, essa risponderà all'user agent con il codice di successo `HTT
 
 Effettuando una richiesta `HTTP POST /`, è possibile verificare che sia l'applicazione sia Redis siano configurati correttamente.
 
-Se l'applicazione è configurata correttamente, essa invia il comando [`PING`](https://redis.io/commands/ping/) al database Redis, e se anch'esso è configurato correttamente, risponderà con la stringa `PONG`, che sarà verificata da Distributed Arcade, rispondendo all'user agent con `HTTP 204`.
+Se l'applicazione è configurata correttamente, essa invierà il comando [`PING`](https://redis.io/commands/ping/) a Redis, e se anch'esso è configurato correttamente, risponderà con la stringa `PONG`, che sarà verificata da Distributed Arcade, rispondendo all'user agent con `HTTP 204`.
 
 ![Diagramma di funzionamento del ping completo](media/diagram-post-ping.png)
 
 #### Creazione di board
 
-Nell'applicazione, amministratori autorizzati possono creare ***board*** ("tabelloni", da *leaderboard*, "classifica"), ricevendo un ***token*** (una stringa di testo url-safe generata in modo crittograficamente sicuro) per l'immissione di punteggi in quello specifico board.
+Nell'applicazione, amministratori autorizzati possono creare ***board*** ("tabelloni", da *leaderboard*, "classifica"), ricevendo un ***token*** (una stringa di testo url-safe generata in modo crittograficamente sicuro) per l'immissione di punteggi in esso.
 
-Perchè venga creato un board, l'amministratore dovrà inviare una richiesta `HTTP POST /board/` verso l'applicazione con i dati del board che si vuole creare:
+Per creare un board, l'amministratore deve inviare una richiesta `HTTP POST /board/` verso l'applicazione, contenente i dati del board che vuole creare:
 
-* il nome del board
-* l'ordinamento del board, ovvero se i punteggi migliori sono quelli più bassi (***crescente***, come nel golf o nelle gare di corsa) o quelli più alti (***decrescente***, come nel salto in alto o nel calcio)
+* il ***nome*** del board
+* l'***ordinamento*** del board, ovvero se devono essere considerati migliori i punteggi più bassi (***crescente***, come nel golf o nelle gare di corsa) o più alti (***decrescente***, come nel salto in alto o nel calcio)
 
 Per ostacolare attacchi [denial-of-service](https://en.wikipedia.org/wiki/Denial-of-service_attack) al database Redis, si richiede all'amministratore di allegare alla richiesta (nell'header `Authorization`) una password, impostata all'installazione di Distributed Arcade.
 
@@ -268,7 +266,7 @@ Per la creazione effettiva del board, internamente vengono effettuate alcune ope
 2. viene verificato che nessuna delle chiavi utilizzate dal board contengano già dati
 3. viene salvato l'ordinamento nella chiave `board:{name}:order` con il comando [`SET`]
 4. viene generata in modo crittograficamente sicuro una stringa detta ***token*** che viene archiviata nella chiave `board:{name}:token` con il comando [`SET`]
-5. viene eseguita in blocco la transazione attraverso il comando [`EXEC`]
+5. viene eseguita la transazione attraverso il comando [`EXEC`]
 
 Terminata la creazione, l'user agent riceve una risposta `HTTP 201` contenente il token generato.
 
@@ -373,9 +371,11 @@ Al fine di verificare correttezza ed efficacia del software, sono stati effettua
 
 ### Richieste manuali
 
-All'applicazione è stata allegato un file [`openapi.yaml`](https://github.com/Steffo99/distributed-arcade/blob/main/docs/openapi.yaml), che descrive tutti i metodi dell'API e può essere interpretato da software esterni [per essere renderizzato](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/Steffo99/distributed-arcade/main/docs/openapi.yaml) o perchè essi forniscano [assistenza allo sviluppo di consumatori dell'API](https://www.jetbrains.com/help/idea/openapi.html).
+All'applicazione è stata allegato un file [`openapi.yaml`](https://github.com/Steffo99/distributed-arcade/blob/main/docs/openapi.yaml), che descrive tutti i metodi dell'API e può essere interpretato da software esterni [per essere renderizzato](https://swagger.io/tools/swagger-ui/) o perchè essi forniscano [assistenza allo sviluppo di consumatori dell'API](https://www.jetbrains.com/help/idea/openapi.html).
 
-Per effettuare test manuali di correttezza dell'API, si è fatto particolare uso di uno di questi renderer, [Swagger UI](https://swagger.io/tools/swagger-ui/).
+Per effettuare test manuali di correttezza dell'API, si è fatto particolare uso di uno di questi renderer, [**Swagger UI**](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/Steffo99/distributed-arcade/main/docs/openapi.yaml).
+
+![Screenshot della documentazione OpenAPI di Distributed Arcade, renderizzata attraverso Swagger UI](media/screenshot-openapi.png)
 
 ### Richieste HTTP di esempio
 
@@ -385,18 +385,17 @@ All'applicazione è stato anche allegato un file [`examples.http`](https://githu
 
 Per verificare l'efficienza dell'applicazione e del database Redis ad essa connesso, è stato utilizzato [Siege](https://www.joedog.org/siege-home/), un tool per lo stress testing di siti web, configurandolo in modo che inviasse più richieste HTTP possibili di [invio di punteggi](invio-di-punteggi).
 
-I risultati ottenuti sono stati eccellenti: è stato raggiunto prima un collo di bottiglia nell'invio delle richieste che nell'elaborazione di esse, raggiungendo le **2400 richieste processate/secondo** in locale su un `AMD Ryzen 5 1600X Six-Core @ 12x 3.6GHz`!
+I risultati ottenuti sono stati eccellenti: è stato raggiunto prima un collo di bottiglia nell'invio delle richieste che nell'elaborazione di esse, superando le **2400 richieste processate/secondo** in locale su un `AMD Ryzen 5 1600X Six-Core @ 12x 3.6GHz`!
 
 ## Possibile estensione: clustering
 
-Nel caso sia necessaria una capacità di elaborazione ancora più elevata, modificando leggermente il nome delle chiavi utilizzate per i board, dovrebbe essere possibile realizzare un [cluster](clustering) di client Redis, permettendo un maggiore throughput in scrittura su diversi board.
+Nel caso fosse necessaria una capacità di elaborazione ancora più elevata, modificando leggermente il nome delle chiavi utilizzate per i board per renderle compatibili, dovrebbe essere possibile realizzare un [cluster](clustering) di client Redis, permettendo un maggiore throughput in scrittura.
 
 ## Conclusione
 
 Redis rispetta le caratteristiche con cui si presenta, ovvero di **semplicità**, **efficienza**, **velocità** e **scalabilità**, confermandosi una buona scelta sia nella sua tipica funzione di database secondario, sia nella meno convenzionale funzione di database secondario.
 
-L'applicazione sviluppata ha soddisfatto tutti i requisiti che ci si era posti all'inizio dello sviluppo, ed è stata messa in produzione con successo: è raggiungibile all'indirizzo *https://arcade.steffo.eu/*.  
-Si spera di utilizzarla per applicazioni future.
+L'applicazione sviluppata ha soddisfatto tutti i requisiti che ci si era posti all'inizio dello sviluppo, ed è stata messa in produzione con successo: è raggiungibile all'indirizzo *[https://arcade.steffo.eu/](https://arcade.steffo.eu/)*, e si spera di utilizzarla in applicazioni future.
 
 ## Bibliografia
 
