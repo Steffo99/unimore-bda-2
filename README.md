@@ -352,11 +352,11 @@ La pagina ottenuta verrà poi restituita all'user agent, assieme a un codice `HT
 ```jsonc
 [
   {
-    "name": "Offets :)",
+    "name": "stefano",
     "score": 2468.19
   },
   {
-    "name": "Steffo :(",
+    "name": "altro-stefano",
     "score": 1234.56
   },
   // [...]
