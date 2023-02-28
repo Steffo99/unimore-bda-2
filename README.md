@@ -262,17 +262,20 @@ Per ostacolare attacchi [denial-of-service](https://en.wikipedia.org/wiki/Denial
 
 Per la creazione effettiva del board, internamente vengono effettuate alcune operazioni:
 
-1. viene aperta una transazione attraverso il comando [`MULTI`]
-2. viene verificato che nessuna delle chiavi utilizzate dal board contengano già dati
-3. viene salvato l'ordinamento nella chiave `board:{name}:order` con il comando [`SET`]
-4. viene generata in modo crittograficamente sicuro una stringa detta ***token*** che viene archiviata nella chiave `board:{name}:token` con il comando [`SET`]
-5. viene eseguita la transazione attraverso il comando [`EXEC`]
+1. viene inserito un lock ottimistico sulle chiavi utilizzate dal board con il comando [`WATCH`]
+2. viene verificato che nessuna delle precedenti chiavi contengano già dati con molteplici comandi [`GET`]
+3. viene aperta una transazione attraverso il comando [`MULTI`]
+4. viene salvato l'ordinamento nella chiave `board:{name}:order` con il comando [`SET`]
+5. viene generata in modo crittograficamente sicuro una stringa detta ***token*** che viene archiviata nella chiave `board:{name}:token` con il comando [`SET`]
+6. se le chiavi lockate non sono state modificate nel frattempo, viene eseguita la transazione attraverso il comando [`EXEC`]
 
 Terminata la creazione, l'user agent riceve una risposta `HTTP 201` contenente il token generato.
 
 ![Diagramma di funzionamento della creazione di board](media/diagram-post-board.png)
 
+[`WATCH`]: https://redis.io/commands/watch/
 [`MULTI`]: https://redis.io/commands/multi/
+[`GET`]: https://redis.io/commands/get/
 [`SET`]: https://redis.io/commands/set/
 [`EXEC`]: https://redis.io/commands/exec/
 
